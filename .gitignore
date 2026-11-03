@@ -1,0 +1,70 @@
+# Python bytecode & caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE & OS files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local data & checkpoints (preserve repository lightweightness)
+data/
+dataset/
+raw/
+results/
+checkpoints/
+llm_logs/
+*.pkl
+*.pt
+*.csv
+*.zip
+*.tar.gz
+
+# Streamlit logs & local states
+.streamlit/
+*.log
+
+# Credentials & environment variables
+.env*
+*.key
+*.pem
+credentials*
+
+# Personal biometric recordings & hardware captures
+personal/
+recordings/
+emotibit_data/
+*.emotibit
+
+# Private academic materials
+documentation/
+learning/
+notes/
+archive/
+reports/

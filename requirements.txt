@@ -1,0 +1,34 @@
+# =============================================================
+# COEN 6322 — Project Dependencies
+# Install: pip install -r requirements.txt
+# =============================================================
+
+# Core data science
+numpy>=1.24
+pandas>=2.0
+scipy>=1.11
+
+# Wearable signal processing
+neurokit2>=0.2.7        # EDA/PPG decomposition, SCR detection, HRV
+
+# Machine learning
+scikit-learn>=1.3       # Random Forest, GroupKFold, metrics
+torch>=2.1              # 1D-CNN (PyTorch)
+
+# Visualisation
+matplotlib>=3.7
+seaborn>=0.12
+
+# Jupyter
+jupyterlab>=4.0
+ipykernel
+
+# LLM (choose one — comment out what you don't use)
+# openai>=1.0           # External API — ONLY with de-identified personal data
+# ollama                # Local models (no data leaves machine) — preferred
+
+# Reproducibility
+joblib>=1.3             # Save/load sklearn models
+
+# Optional: bootstrap CI
+# bootstrapped          # https://github.com/facebookincubator/bootstrapped
