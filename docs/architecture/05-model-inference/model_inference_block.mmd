@@ -1,0 +1,59 @@
+graph TB
+    %% Stage 5: Block Diagram
+    subgraph INPUT_MODES["Sensor Input Ingestion Modes (src/act/sensor_adapter.py)"]
+        MODE_A["Mode A: PhysioNet Replay<br/>Authentic DS1 Sessions (N=34)"]
+        MODE_B["Mode B: Synthetic Signal Demo<br/>Zero-Dependency In-Memory Generator"]
+        MODE_C["Mode C: EmotiBit File Import<br/>Local Oscilloscope CSVs"]
+        MODE_D["Mode D: Live EmotiBit Adapter<br/>UDP Port 31337 [HARDWARE PENDING]"]
+    end
+
+    subgraph SENSE_LAYER["SENSE: Sliding Window Buffer Engine"]
+        ADAPTER["BaseSensorAdapter / ReplaySensorAdapter<br/>- Circular Time Buffer (30s length, 5s stride)<br/>- Memory pruning (< current_time - 60s)<br/>- Quality gate: length >= 30s & finite"]
+        WIN_OUT["Buffered Window Context:<br/>- eda_window (120 samples)<br/>- bvp_window (1920 samples)<br/>- quality_status: 'GOOD' / 'POOR'<br/>- window_start_s, window_end_s"]
+        ADAPTER --> WIN_OUT
+    end
+
+    subgraph THINK_LAYER["THINK: Physiological Inference Engine"]
+        CKPT_RF["Model Checkpoint Loader<br/>deploy_RF_EDA+PPG.pkl<br/>(model, scaler, sensor_config)"]
+        FEAT_CALC["FeatureExtractor<br/>Computes 20D Physio Vector"]
+        RF_PRED["Inference: model.predict_proba()<br/>Output: pred_label ('REST'/'STRESS'), confidence"]
+        RESEARCH_EXPANDER["Collapsible Research Panel<br/>Live display of research_comparison.csv<br/>(H1 FAR reduction & Pareto metrics)"]
+        CKPT_RF & FEAT_CALC --> RF_PRED
+        RF_PRED -.-> RESEARCH_EXPANDER
+    end
+
+    subgraph ACT_LAYER["ACT: Dual Recommendation Engines (src/act/act_evaluator.py)"]
+        CTX_STRUCT["Structured Physiological State Context:<br/>{prediction, confidence, eda_mean, pulse_bpm, motion_acc, quality}"]
+        
+        subgraph RULE_ENG["1. Deterministic Rule-Based ACT Engine"]
+            RULES["Evaluates Clinical Safety Rules:<br/>- POOR quality -> CHECK_SENSOR_FIT<br/>- High motion -> EXERCISE_AROUSAL_RECOGNIZED<br/>- Stress & conf >= 0.65 -> STRESS_BREATHING_BREAK<br/>- Calm baseline -> MAINTAIN_EQUILIBRIUM"]
+            RULE_OUT["Action Code & Structured Guidance<br/>Latency: < 0.1 ms | Zero Hallucinations"]
+            RULES --> RULE_OUT
+        end
+
+        subgraph LLM_ENG["2. LLM Natural Language Recommender"]
+            LLM_ADAPTER["LLMActAdapter (offline-mock-v1 / API)<br/>Empathetic contextual wellness text"]
+            LLM_OUT["Natural Language Advice Card<br/>Latency ~120ms | Cost: $0.00012"]
+            LLM_ADAPTER --> LLM_OUT
+        end
+
+        CTX_STRUCT --> RULES & LLM_ADAPTER
+    end
+
+    subgraph UI_OUTPUT["Streamlit Dashboard Presentation (src/act/dashboard.py)"]
+        DASH_UI["Three-Column Layout:<br/>- Col 1: SENSE (Biometric Charts)<br/>- Col 2: THINK (Model Probability Gauge)<br/>- Col 3: ACT (Rules vs LLM Recommendations)"]
+        STEP_LOG[("Session Logger<br/>llm_logs/replay_session_log.json")]
+        RULE_OUT & LLM_OUT --> DASH_UI --> STEP_LOG
+    end
+
+    MODE_A & MODE_B & MODE_C & MODE_D --> ADAPTER
+    WIN_OUT --> FEAT_CALC
+    WIN_OUT --> CTX_STRUCT
+    RF_PRED --> CTX_STRUCT
+
+    style INPUT_MODES fill:#f8f9fa,stroke:#6c757d
+    style SENSE_LAYER fill:#e8f4f8,stroke:#0c5460
+    style THINK_LAYER fill:#d1ecf1,stroke:#0c5460
+    style ACT_LAYER fill:#fff3cd,stroke:#856404
+    style UI_OUTPUT fill:#d4edda,stroke:#155724,stroke-width:2px
+    style MODE_D fill:#f8d7da,stroke:#dc3545,stroke-dasharray: 5 5

@@ -1,0 +1,55 @@
+graph LR
+    %% Stage 2: Block Diagram
+    subgraph INPUT["Input: 30-Second Window Object"]
+        EDA_WIN["eda_window<br/>120 samples @ 4 Hz"]
+        BVP_WIN["bvp_window<br/>1920 samples @ 64 Hz"]
+        ACC_WIN["acc_window<br/>960 x 3 samples @ 32 Hz"]
+    end
+
+    subgraph FEAT_ENG["Handcrafted Feature Extractor (src/features/feature_extractor.py)"]
+        subgraph EDA_FEATS["10 EDA Statistical & Phasic Features"]
+            E1["1. Mean<br/>2. Std Dev<br/>3. Min<br/>4. Max<br/>5. Range (Max-Min)"]
+            E2["6. Linear Slope (polyfit)<br/>7. Tonic Mean (5s kernel)<br/>8. SCR Peak Count (h>=0.01)<br/>9. Max SCR Peak Amplitude<br/>10. Sum of SCR Amplitudes"]
+        end
+        subgraph BVP_FEATS["10 BVP/PPG Morphological & Spectral Features"]
+            P1["1. Mean<br/>2. Std Dev<br/>3. Range<br/>4. Energy (mean x^2)<br/>5. Pulse Rate BPM (peaks)"]
+            P2["6. Mean PPI (Peak-to-Peak)<br/>7. SDRR (Std PPI)<br/>8. RMSSD (diff PPI)<br/>9. LF Power (0.5-2.0 Hz)<br/>10. HF Power (2.0-5.0 Hz)"]
+        end
+    end
+
+    subgraph ACC_ENG["Motion Feature Extractor (src/research/acc_aware/acc_features.py)"]
+        subgraph ACC_7D["7 Tri-Axial ACC Features"]
+            A1["1. SVM_MEAN (Signal Vector Mag)<br/>2. SVM_STD<br/>3. DYNAMIC_SVM_MEAN (Gravity removed)<br/>4. DYNAMIC_SVM_STD"]
+            A2["5. SMA (Signal Magnitude Area)<br/>6. ENERGY (Mean SVM^2)<br/>7. JERK_MEAN (d(SVM)/dt * fs)"]
+        end
+    end
+
+    subgraph TENSOR_ENG["Temporal Tensor Builder (src/models/tensor_builder.py)"]
+        RESAMP_EDA["Resample EDA: 4 Hz -> 16 Hz<br/>(480 samples)"]
+        RESAMP_BVP["Resample BVP: 64 Hz -> 16 Hz<br/>(480 samples)"]
+        STACK["Stack Channels: (C, 480)<br/>C=1 (EDA/PPG), C=2 (Fusion)"]
+    end
+
+    subgraph OUTPUT_REPS["Output Mathematical Representations"]
+        REP_20D["20D Physiological Vector (Tabular)<br/>Used by Random Forest & KNN<br/>shape: (20,) float32"]
+        REP_7D["7D Motion Vector (Kinematic)<br/>Used by H1 Movement Gate<br/>shape: (7,) float32"]
+        REP_TENSOR["Temporal Waveform Tensor<br/>Used by PyTorch 1D-CNN<br/>shape: (C, 480) float32"]
+    end
+
+    EDA_WIN --> E1 & E2
+    BVP_WIN --> P1 & P2
+    ACC_WIN --> A1 & A2
+
+    EDA_WIN --> RESAMP_EDA
+    BVP_WIN --> RESAMP_BVP
+    RESAMP_EDA & RESAMP_BVP --> STACK
+
+    E1 & E2 & P1 & P2 --> REP_20D
+    A1 & A2 --> REP_7D
+    STACK --> REP_TENSOR
+
+    style INPUT fill:#f8f9fa,stroke:#6c757d
+    style FEAT_ENG fill:#e8f4f8,stroke:#0c5460
+    style ACC_ENG fill:#e8f4f8,stroke:#0c5460
+    style TENSOR_ENG fill:#e9ecef,stroke:#495057
+    style OUTPUT_REPS fill:#d4edda,stroke:#155724,stroke-width:2px

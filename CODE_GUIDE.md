@@ -4,6 +4,7 @@
 **Scope:** Standalone Research Codebase (`code/`)
 
 This document provides a technical walkthrough of every module and data pipeline in the codebase.
+For visual engineering block diagrams and algorithmic flowcharts, see the dedicated documentation index at [`docs/architecture/README.md`](docs/architecture/README.md).
 
 ---
 

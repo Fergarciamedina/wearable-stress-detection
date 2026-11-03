@@ -1,0 +1,43 @@
+graph LR
+    %% Stage 4: Block Diagram
+    subgraph SPLIT_ENGINE["LOSO Partitioning (src/evaluation/splits.py)"]
+        MANIFEST["loso_splits.json<br/>34 Outer Folds"]
+        FOLD_I["Fold i: Test Subject s_test<br/>Train Subjects s_train (N=33)"]
+        MANIFEST --> FOLD_I
+    end
+
+    subgraph ISOLATION_BOUNDARY["Strict Data Isolation Boundary (Zero Leakage)"]
+        direction TB
+        TRAIN_ENV["Training Environment (s_train)<br/>- StandardScaler.fit()<br/>- RF.fit()<br/>- H1 Percentile.fit()<br/>- H2 KNN.fit()"]
+        TEST_ENV["Held-Out Test Environment (s_test)<br/>- Stress Session: X_test_rs, y_test_rs, acc_test_rs<br/>- Exercise Challenge: X_test_ex, acc_test_ex"]
+    end
+
+    subgraph FUSION_EVAL["Policy Evaluation Engine (run_research_experiments.py)"]
+        direction TB
+        E0["E0: Baseline RF Prediction<br/>y_pred_base = rf.predict(X_test)"]
+        E1["E1: H1 Gated Prediction<br/>y_e1 = acc_ctx.contextualize(y_pred_base, acc_test)"]
+        E2["E2: H2 Similarity Gated<br/>y_e2 = sim_ctx.contextualize(y_pred_base, X_test)"]
+        E3["E3: Sequential Combined<br/>y_e3 = sim_ctx.contextualize(y_e1, X_test)"]
+        E0 --> E1 & E2 --> E3
+    end
+
+    subgraph METRICS_CALC["Metrics Calculation (src/evaluation/metrics.py)"]
+        STRESS_EVAL["Stress Session Scoring:<br/>compute_binary_metrics(y_true, y_pred)<br/>- Macro-F1<br/>- Stress Recall & F1<br/>- Rest Recall & F1<br/>- Balanced Accuracy"]
+        EX_EVAL["Exercise Challenge Scoring:<br/>compute_exercise_far(y_ex_pred)<br/>- Exercise FAR = False Stress / Total Ex Windows"]
+    end
+
+    subgraph PERSIST["Results Persistence"]
+        CSV_SUMMARY[("research_comparison.csv<br/>Summary: Macro-F1, FAR, Acc")]
+        CSV_FOLDS[("fold_predictions.csv<br/>34 Folds x 4 Configurations")]
+    end
+
+    FOLD_I --> TRAIN_ENV & TEST_ENV
+    TRAIN_ENV & TEST_ENV --> FUSION_EVAL
+    FUSION_EVAL --> STRESS_EVAL & EX_EVAL
+    STRESS_EVAL & EX_EVAL --> CSV_SUMMARY & CSV_FOLDS
+
+    style SPLIT_ENGINE fill:#f8f9fa,stroke:#6c757d
+    style ISOLATION_BOUNDARY fill:#fff3cd,stroke:#856404,stroke-width:2px,stroke-dasharray: 5 5
+    style FUSION_EVAL fill:#e8f4f8,stroke:#0c5460
+    style METRICS_CALC fill:#d1ecf1,stroke:#0c5460
+    style PERSIST fill:#d4edda,stroke:#155724,stroke-width:2px

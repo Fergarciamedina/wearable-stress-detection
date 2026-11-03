@@ -1,0 +1,49 @@
+graph LR
+    %% Stage 3: Block Diagram
+    subgraph TRAIN_PARTITION["Fold Training Partition (N-1 Subjects)"]
+        TR_STRESS["Training Stress Sessions<br/>REST (y=0) & STRESS (y=1)<br/>Physiological: (N_tr, 20)"]
+        TR_EXERCISE["Training Exercise Sessions<br/>Held-out Challenge (y=2)<br/>Physiological: (N_ex, 20)<br/>ACC Motion: (N_ex, 7)"]
+        TR_TENSORS["Training Waveform Tensors<br/>(N_tr, C, 480)"]
+    end
+
+    subgraph BASE_TRAIN["1. Base Supervised Model Training"]
+        SCALER_RF["StandardScaler (Train-only)<br/>Fit on TR_STRESS 20D"]
+        RF_MODEL["Random Forest Classifier<br/>n_estimators=100, max_depth=8<br/>min_samples_split=4, class_weight='balanced'"]
+        SCALER_CNN["Channel Standardization<br/>mean & std over (0, 2)"]
+        CNN_MODEL["PyTorch Small1DCNN<br/>2 Conv Layers + GAP + Linear<br/>Adam lr=1e-3, early stopping"]
+        TR_STRESS --> SCALER_RF --> RF_MODEL
+        TR_TENSORS --> SCALER_CNN --> CNN_MODEL
+    end
+
+    subgraph H1_CALIBRATION["2. H1: Movement Gate Calibration (acc_aware)"]
+        EXT_DYN["Extract DYNAMIC_SVM_MEAN<br/>from training exercise ACC windows"]
+        CALC_PCT["Compute 25th Percentile<br/>threshold_ = np.percentile(dyn_means, 25.0)"]
+        H1_GATE["MovementContextualizer Object<br/>is_high_movement(win) -> dyn >= threshold_<br/>contextualize(y_pred, acc_wins)"]
+        TR_EXERCISE --> EXT_DYN --> CALC_PCT --> H1_GATE
+    end
+
+    subgraph H2_INDEXING["3. H2: Physiological k-NN Index (similarity_aware)"]
+        CONCAT_REF["Reference Pool Assembly:<br/>- REST (label 0)<br/>- STRESS (label 1)<br/>- EXERCISE (label 2)"]
+        SCALER_KNN["StandardScaler (Ref-only)<br/>Fit on concatenated 20D features"]
+        KNN_BALLTREE["Exact NearestNeighbors Index<br/>k=7, metric='euclidean', algorithm='ball_tree'"]
+        H2_CTX["SimilarityContextualizer Object<br/>ex_threshold = 0.40 (>= 3/7 neighbors)"]
+        TR_STRESS & TR_EXERCISE --> CONCAT_REF --> SCALER_KNN --> KNN_BALLTREE --> H2_CTX
+    end
+
+    subgraph FUSION_CFG["4. Decision Fusion Policy (fusion/fusion_policy.py)"]
+        POL_E0["E0: Baseline RF<br/>(No contextualization)"]
+        POL_E1["E1: RF + H1 Gate<br/>(Override STRESS->REST if high motion)"]
+        POL_E2["E2: RF + H2 Gate<br/>(Override STRESS->REST if ex_frac >= 0.4)"]
+        POL_E3["E3: RF + H1 + H2<br/>(Sequential: H1 Motion -> H2 Similarity)"]
+    end
+
+    RF_MODEL --> POL_E0
+    RF_MODEL & H1_GATE --> POL_E1
+    RF_MODEL & H2_CTX --> POL_E2
+    RF_MODEL & H1_GATE & H2_CTX --> POL_E3
+
+    style TRAIN_PARTITION fill:#f8f9fa,stroke:#6c757d
+    style BASE_TRAIN fill:#e8f4f8,stroke:#0c5460
+    style H1_CALIBRATION fill:#d1ecf1,stroke:#0c5460
+    style H2_INDEXING fill:#e8f4f8,stroke:#0c5460
+    style FUSION_CFG fill:#d4edda,stroke:#155724,stroke-width:2px

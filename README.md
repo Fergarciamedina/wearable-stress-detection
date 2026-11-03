@@ -44,6 +44,22 @@ Under strict 34-fold LOSO cross-validation, contextualizing RF (EDA+PPG) with ac
 
 ---
 
+## 📐 Visual System Architecture & Diagrams
+
+A comprehensive, code-accurate technical documentation system with engineering block diagrams and algorithmic flowcharts is available under [`docs/architecture/`](docs/architecture/README.md):
+
+- **[Level 0: Complete System Overview](docs/architecture/00-system-overview/README.md):** Macro block diagrams and full execution flowcharts across all five stages.
+- **[Stage 1: Data Preparation & Preprocessing](docs/architecture/01-data-preparation/README.md):** Butterworth filters, signal loader, protocol reconstruction, and 30s windowing.
+- **[Stage 2: Feature Engineering & Representation](docs/architecture/02-feature-engineering/README.md):** 20D physiological features, 7D kinematic motion features, and waveform tensors.
+- **[Stage 3: Model Training & Contextualization](docs/architecture/03-model-training/README.md):** Random Forest, 1D-CNN, H1 movement threshold calibration, and H2 $k$-NN indexing.
+- **[Stage 4: Model Evaluation & Validation](docs/architecture/04-model-evaluation/README.md):** 34-fold nested LOSO cross-validation, E0–E3 experiment matrix, and metrics.
+- **[Stage 5: Model Inference & Application](docs/architecture/05-model-inference/README.md):** Sense–Think–Act Streamlit demonstrator, ring buffer, rules engine vs. LLM.
+- **[Subsystems Architecture Deep Dives](docs/architecture/subsystems/README.md):** 8 technical subsystem specifications with block diagrams and flowcharts.
+- **[2D PCA Vector Space Visualization](docs/architecture/visualizations/README.md):** Real 2D projection of 10,414 authentic windows demonstrating autonomic overlap and $k$-NN retrieval.
+- **[Level 4: Python Code Execution Map](docs/architecture/00-system-overview/python_execution_map.md):** Exact file-by-file call graphs and entry point traces.
+
+---
+
 ## 📁 Repository Structure
 
 ```text
@@ -51,6 +67,8 @@ code/
 ├── README.md                      # This technical guide
 ├── requirements.txt               # Pinned dependencies
 ├── Makefile                       # Automation shortcuts (test, audit, figures, demo)
+├── docs/                          # Architecture documentation & diagrams
+│   └── architecture/              # 5 Stages, Subsystems, Flowcharts, PCA Cloud
 ├── tests/                         # Automated unit & integration tests
 │   ├── __init__.py
 │   ├── test_pipeline.py           # 10 comprehensive pipeline tests

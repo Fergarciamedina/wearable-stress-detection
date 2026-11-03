@@ -1,0 +1,45 @@
+flowchart TD
+    %% Stage 4: Execution Flowchart
+    START(["Start Research Evaluation: run_research_experiments()"]):::terminator --> LOAD_SPLITS["Load manifest: loso_splits.json (34 folds)"]:::process
+    LOAD_SPLITS --> CHECK_RESUME{"Check fold_predictions.csv exists?"}:::decision
+    CHECK_RESUME -->|"Yes"| LOAD_DONE["Load done_folds set to skip completed"]:::process
+    CHECK_RESUME -->|"No"| INIT_EMPTY["Initialize fold_rows = []"]:::process
+
+    LOAD_DONE & INIT_EMPTY --> FOLD_LOOP{"For each fold in manifest (34 total)"}:::decision
+    FOLD_LOOP -->|"Fold i already done"| SKIP_FOLD["Skip fold"]:::process
+    SKIP_FOLD --> FOLD_LOOP
+
+    FOLD_LOOP -->|"Execute Fold i"| ISOLATE["Isolate s_test, s_train, s_val"]:::process
+    ISOLATE --> FIT_ALL["Fit Stage 3 Models on s_train:<br/>1. Scaler + Random Forest<br/>2. H1 MovementContextualizer (25th pct)<br/>3. H2 SimilarityContextualizer (k=7)"]:::subproc
+
+    FIT_ALL --> TEST_PRED["Transform Held-Out Test Features:<br/>X_test_scaled = scaler.transform(X_test_rs)<br/>y_pred_base = rf.predict(X_test_scaled)"]:::process
+
+    TEST_PRED --> POLICY_EVAL{"For exp in [E0, E1, E2, E3]"}:::decision
+
+    POLICY_EVAL -->|"E0"| RUN_E0["y_ctx = y_pred_base"]:::process
+    POLICY_EVAL -->|"E1"| RUN_E1["y_ctx = acc_ctx.contextualize(y_pred_base, acc_test_rs)"]:::process
+    POLICY_EVAL -->|"E2"| RUN_E2["y_ctx = sim_ctx.contextualize(y_pred_base, X_test_rs)"]:::process
+    POLICY_EVAL -->|"E3"| RUN_E3["y_inter = acc_ctx.contextualize(y_pred_base, acc_test_rs)<br/>y_ctx = sim_ctx.contextualize(y_inter, X_test_rs)"]:::process
+
+    RUN_E0 & RUN_E1 & RUN_E2 & RUN_E3 --> SCORE_STRESS["Compute Binary Metrics on Stress Session:<br/>m = compute_binary_metrics(y_test_rs, y_ctx)<br/>- macro_f1, balanced_acc, f1_rest, f1_stress"]:::subproc
+
+    SCORE_STRESS --> HAS_EX{"s_test has exercise challenge windows?"}:::decision
+    HAS_EX -->|"Yes"| EVAL_EX["Predict on Exercise Windows:<br/>y_ex_base = rf.predict(scaler.transform(X_test_ex))<br/>y_ex_ctx = policy.fuse(y_ex_base, acc_test_ex, X_test_ex)<br/>far = compute_exercise_far(y_ex_ctx)"]:::subproc
+    HAS_EX -->|"No"| SET_NAN_FAR["far = NaN"]:::process
+
+    EVAL_EX & SET_NAN_FAR --> APPEND_RES["Record fold row:<br/>{fold_idx, test_subject, experiment, macro_f1, f1_stress, far}"]:::process
+    APPEND_RES --> POLICY_EVAL
+
+    POLICY_EVAL -->|"All 4 exps done for Fold i"| FLUSH_CSV["Save progress to fold_predictions.csv"]:::storage
+    FLUSH_CSV --> FOLD_LOOP
+
+    FOLD_LOOP -->|"All 34 Folds Complete"| AGGREGATE["Compute Macro Aggregate Summary:<br/>Mean, Std, CIs per Experiment Configuration"]:::process
+    AGGREGATE --> SAVE_SUMMARY[("Save research_comparison.csv")]:::storage
+    SAVE_SUMMARY --> END_EVAL(["Evaluation Complete"]):::terminator
+
+    %% Styling
+    classDef terminator fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#155724;
+    classDef process fill:#e8f4f8,stroke:#17a2b8,stroke-width:1.5px,color:#0c5460;
+    classDef subproc fill:#d1ecf1,stroke:#0c5460,stroke-width:2px,color:#0c5460;
+    classDef decision fill:#fff3cd,stroke:#ffc107,stroke-width:2px,color:#856404;
+    classDef storage fill:#f8d7da,stroke:#dc3545,stroke-width:1.5px,color:#721c24;

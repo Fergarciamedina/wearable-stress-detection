@@ -1,0 +1,12 @@
+{
+  "total_windows_extracted": 10414,
+  "rest_windows": 2741,
+  "stress_windows": 625,
+  "exercise_windows": 7048,
+  "sampled_windows": 1300,
+  "pc1_variance_pct": 36.27000045776367,
+  "pc2_variance_pct": 20.829999923706055,
+  "cumulative_variance_pct": 57.099998474121094,
+  "k_neighbors": 7,
+  "query_exercise_fraction": 0.5714
+}

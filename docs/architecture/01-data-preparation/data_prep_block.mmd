@@ -1,0 +1,51 @@
+graph LR
+    %% Stage 1: Block Diagram
+    subgraph INGESTION["Raw Dataset Storage"]
+        DIR["Wearable_Dataset/<br/>STRESS/, AEROBIC/, ANAEROBIC/"]
+        CSV_EDA["EDA.csv<br/>4 Hz (Tonic/Phasic Conductance)"]
+        CSV_BVP["BVP.csv<br/>64 Hz (Blood Volume Pulse)"]
+        CSV_ACC["ACC.csv<br/>32 Hz (3-Axis Accelerometer)"]
+        CSV_TAGS["tags.csv<br/>Button Event Timestamps"]
+        DIR --> CSV_EDA & CSV_BVP & CSV_ACC & CSV_TAGS
+    end
+
+    subgraph AUDIT_MOD["Audit & Quality Gate (src/data_audit.py)"]
+        CHK_S02{"Subject == S02?"}
+        CHK_F07{"Subject == f07?"}
+        S02_EXC["Exclude S02<br/>(Duplicated raw records)"]
+        F07_EXC["Flag f07 BVP/TEMP Invalid<br/>(Dock cover artifact)"]
+        CHK_S02 -->|Yes| S02_EXC
+        CHK_F07 -->|Yes| F07_EXC
+    end
+
+    subgraph LOADER["Signal Loader (src/preprocessing/signal_loader.py)"]
+        PARSER["parse_empatica_csv()<br/>Header split: timestamp, fs, values"]
+        TAG_PARSER["parse_tags_csv()<br/>UTC Timestamps list"]
+        RECON["reconstruct_stress_intervals()<br/>Protocol V1: Baseline, Stroop, Rest, TMCT, Speech, Math<br/>Protocol V2: Baseline, Rest, TMCT, Speech, Rest, Math"]
+        PARSER & TAG_PARSER --> RECON
+    end
+
+    subgraph SEGMENTER["Window Segmenter (src/preprocessing/segmentation.py)"]
+        WIN_DEF["30.0s Window Length<br/>15.0s Temporal Stride"]
+        PHASE_GUARD["Phase Boundary Enforcer<br/>curr_start + 30.0s <= phase_end"]
+        SLICE_EDA["Slice EDA: 120 samples @ 4 Hz"]
+        SLICE_BVP["Slice BVP: 1920 samples @ 64 Hz"]
+        SLICE_ACC["Slice ACC: 960 x 3 samples @ 32 Hz"]
+        WIN_DEF --> PHASE_GUARD --> SLICE_EDA & SLICE_BVP & SLICE_ACC
+    end
+
+    subgraph OUTPUT_STRUCT["Segmented Output Window Dict"]
+        WIN_DICT["Window Object:<br/>- subject_id: str<br/>- session_type: STRESS / AEROBIC / ANAEROBIC<br/>- label: 0 (REST), 1 (STRESS), -1 (CHALLENGE)<br/>- eda_window: ndarray(120,)<br/>- bvp_window: ndarray(1920,) or None<br/>- acc_window: ndarray(960, 3) or None<br/>- window_start_s, window_end_s: float"]
+    end
+
+    CSV_EDA & CSV_BVP & CSV_ACC --> PARSER
+    CSV_TAGS --> TAG_PARSER
+    AUDIT_MOD -.-> LOADER
+    RECON --> SEGMENTER
+    SLICE_EDA & SLICE_BVP & SLICE_ACC --> WIN_DICT
+
+    style INGESTION fill:#f8f9fa,stroke:#6c757d
+    style AUDIT_MOD fill:#fff3cd,stroke:#856404
+    style LOADER fill:#e8f4f8,stroke:#0c5460
+    style SEGMENTER fill:#d1ecf1,stroke:#0c5460
+    style OUTPUT_STRUCT fill:#d4edda,stroke:#155724,stroke-width:2px

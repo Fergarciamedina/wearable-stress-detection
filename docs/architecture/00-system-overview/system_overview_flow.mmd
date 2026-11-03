@@ -1,0 +1,51 @@
+flowchart TD
+    %% Level 0: Macro Execution Flowchart
+    START(["Program Entry: CLI / Runner / Dashboard"]):::terminator --> CONF["Load Configuration & Environment<br/>config.py: ProjectConfig"]:::process
+    CONF --> ROUTE{"Select Primary Execution Mode"}:::decision
+
+    %% Path 1: Data Audit
+    ROUTE -->|"CLI: make audit"| AUDIT["Run Physical Signal Audit<br/>data_audit.py"]:::process
+    AUDIT --> AUDIT_OUT[("Save Audit CSVs<br/>results/data_audit/")]:::storage
+
+    %% Path 2: Baseline Factorial
+    ROUTE -->|"CLI: make train"| EXP_BASE["Run 3x3 Factorial LOSO<br/>run_experiments.py"]:::process
+    EXP_BASE --> SPLITS["Generate/Load LOSO Splits<br/>splits.py"]:::subproc
+    SPLITS --> FACT_LOOP["Iterate Models x Sensors x Seeds"]:::subproc
+    FACT_LOOP --> FACT_METRICS[("Save Factorial Metrics<br/>results/metrics/")]:::storage
+
+    %% Path 3: Research Contextualization
+    ROUTE -->|"CLI: research runner"| EXP_RES["Run Contextualized LOSO (E0-E3)<br/>run_research_experiments.py"]:::process
+    EXP_RES --> RES_INGEST["Ingest EDA, PPG, ACC Sessions<br/>signal_loader.py"]:::subproc
+    RES_INGEST --> RES_SEG["Segment 30s Temporal Windows<br/>segmentation.py"]:::subproc
+    RES_SEG --> RES_FEAT["Compute 20D Physio + 7D Motion<br/>feature_extractor.py | acc_features.py"]:::subproc
+    RES_FEAT --> RES_FOLDS{"Iterate 34 LOSO Folds"}:::decision
+
+    RES_FOLDS -->|"Fold i"| FOLD_FIT["1. Train RF on N-1 Subjects<br/>2. Fit H1 ACC Gate (25th pct DynSVM)<br/>3. Build H2 KNN Index (k=7)"]:::process
+    FOLD_FIT --> FOLD_EVAL["Evaluate Held-Out Test Subject<br/>E0: Baseline RF<br/>E1: RF + H1 (ACC Gate)<br/>E2: RF + H2 (KNN Physio)<br/>E3: RF + H1 + H2 (Combined)"]:::process
+    FOLD_EVAL --> RES_FOLDS
+    RES_FOLDS -->|"Completed 34 Folds"| RES_OUT[("Save Research CSVs<br/>research_comparison.csv<br/>fold_predictions.csv")]:::storage
+
+    %% Path 4: Dashboard
+    ROUTE -->|"CLI: streamlit run"| DASH_INIT["Start Streamlit UI<br/>dashboard.py"]:::process
+    DASH_INIT --> MODE_SEL{"Input Mode?"}:::decision
+    MODE_SEL -->|"Mode A"| REPLAY["PhysioNet Dataset Replay<br/>sensor_adapter.py"]:::subproc
+    MODE_SEL -->|"Mode B"| SYNTH["Synthetic Demo Generator"]:::subproc
+    MODE_SEL -->|"Mode C/D"| EMOTIBIT["EmotiBit CSV / UDP<br/>[Hardware Pending]"]:::subproc
+
+    REPLAY & SYNTH & EMOTIBIT --> SLIDE["Buffer 30s Window (stride=5s)"]:::process
+    SLIDE --> INFER["Load Checkpoint & Predict<br/>deploy_RF_EDA+PPG.pkl"]:::subproc
+    INFER --> ACT_ENGINE["Select Recommendation Engine"]:::decision
+    ACT_ENGINE -->|"Deterministic"| RULE["Rule Engine (< 0.1ms)<br/>act_evaluator.py"]:::process
+    ACT_ENGINE -->|"Offline LLM"| LLM["LLM Recommender Adapter<br/>act_evaluator.py"]:::process
+    RULE & LLM --> DISP["Render Live UI Dashboard<br/>SENSE + THINK + ACT Cards"]:::output
+    DISP --> REPLAY_LOOP{"Next Timestep?"}:::decision
+    REPLAY_LOOP -->|"Yes"| SLIDE
+    REPLAY_LOOP -->|"User Stop"| END(["End Execution"]):::terminator
+
+    %% Styling
+    classDef terminator fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#155724;
+    classDef process fill:#e8f4f8,stroke:#17a2b8,stroke-width:1.5px,color:#0c5460;
+    classDef subproc fill:#d1ecf1,stroke:#0c5460,stroke-width:2px,color:#0c5460;
+    classDef decision fill:#fff3cd,stroke:#ffc107,stroke-width:2px,color:#856404;
+    classDef storage fill:#f8d7da,stroke:#dc3545,stroke-width:1.5px,color:#721c24;
+    classDef output fill:#e2e3e5,stroke:#383d41,stroke-width:1.5px,color:#383d41;

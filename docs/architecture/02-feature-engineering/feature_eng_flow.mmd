@@ -1,0 +1,42 @@
+flowchart TD
+    %% Stage 2: Execution Flowchart
+    START(["Start: Extract Features for Window"]):::terminator --> ROUTE{"Sensor Set / Model Branch"}:::decision
+
+    %% Branch 1: Feature Extraction
+    ROUTE -->|"Tabular (RF / KNN)"| IN_WIN["Input Window Dict: eda_window, bvp_window"]:::process
+    IN_WIN --> EXTRACT_EDA["extract_eda_features(eda_window):<br/>1. Moments: mean, std, min, max, range<br/>2. Slope: polyfit(x, eda, 1)[0]<br/>3. Tonic: 5s moving avg kernel conv<br/>4. Phasic: eda - tonic<br/>5. Peaks: find_peaks(phasic, h>=0.01, d=4)<br/>6. Output: 10 EDA features"]:::subproc
+
+    EXTRACT_EDA --> BVP_CHECK{"bvp_window is None?"}:::decision
+    BVP_CHECK -->|"Yes"| ZERO_BVP["bvp_features = zeros(10)"]:::process
+    BVP_CHECK -->|"No"| EXTRACT_BVP["extract_bvp_features(bvp_window):<br/>1. Moments: mean, std, range, energy<br/>2. Peaks: find_peaks(bvp, dist=25, prom=std*0.5)<br/>3. PPI: diff(peaks) / 64.0<br/>4. Pulse BPM: 60.0 / mean(PPI)<br/>5. SDRR: std(PPI), RMSSD: sqrt(mean(diff(PPI)^2))<br/>6. PSD: welch() -> LF (0.5-2.0Hz), HF (2.0-5.0Hz)<br/>7. Output: 10 BVP features"]:::subproc
+
+    ZERO_BVP & EXTRACT_BVP --> CONCAT_PHYSIO["Concatenate Physiological Vector:<br/>EDA only: (10,)<br/>PPG only: (10,)<br/>EDA+PPG Fusion: (20,) float32"]:::process
+    CONCAT_PHYSIO --> NAN_GUARD["np.nan_to_num(features, nan=0.0)"]:::process
+    NAN_GUARD --> OUT_PHYSIO(["Return 20D Feature Vector"]):::terminator
+
+    %% Branch 2: ACC Motion Extraction
+    ROUTE -->|"Kinematics (H1 Gate)"| IN_ACC["Input: acc_window (N, 3)"]:::process
+    IN_ACC --> CHECK_ACC_SHAPE{"len(acc) >= 2 and shape[1] == 3?"}:::decision
+    CHECK_ACC_SHAPE -->|"No"| ZERO_ACC["Return zeros(7)"]:::process
+    CHECK_ACC_SHAPE -->|"Yes"| COMP_SVM["SVM = sqrt(x^2 + y^2 + z^2)"]:::process
+    COMP_SVM --> SUB_GRAV["Gravity Removal:<br/>kernel = ones(32) / 32<br/>gravity = convolve(SVM, kernel, 'same')<br/>dynamic_svm = SVM - gravity"]:::subproc
+    SUB_GRAV --> COMP_ACC_FEATS["Compute 7 ACC Features:<br/>1. mean(SVM), 2. std(SVM)<br/>3. mean(|dynamic_svm|), 4. std(dynamic_svm)<br/>5. mean(sum(|x|+|y|+|z|)) (SMA)<br/>6. mean(SVM^2) (Energy)<br/>7. mean(|diff(SVM)| * fs) (Jerk)"]:::process
+    COMP_ACC_FEATS --> OUT_ACC(["Return 7D Motion Vector"]):::terminator
+
+    %% Branch 3: Tensor Resampling
+    ROUTE -->|"Waveform (1D-CNN)"| IN_TENSOR["Input: eda_window, bvp_window"]:::process
+    IN_TENSOR --> RES_EDA["Resample EDA:<br/>scipy.signal.resample(eda, 480)"]:::subproc
+    RES_EDA --> RES_BVP{"BVP valid?"}:::decision
+    RES_BVP -->|"No"| ZERO_TENSOR["bvp_resampled = zeros(480)"]:::process
+    RES_BVP -->|"Yes"| RESAMPLE_BVP["Resample BVP:<br/>scipy.signal.resample(bvp, 480)"]:::subproc
+    ZERO_TENSOR & RESAMPLE_BVP --> STACK_CHANNELS{"sensor_config?"}:::decision
+    STACK_CHANNELS -->|"EDA"| STACK_1A["shape: (1, 480)"]:::process
+    STACK_CHANNELS -->|"PPG"| STACK_1B["shape: (1, 480)"]:::process
+    STACK_CHANNELS -->|"EDA+PPG"| STACK_2["shape: (2, 480)"]:::process
+    STACK_1A & STACK_1B & STACK_2 --> OUT_TENSOR(["Return PyTorch Input Tensor"]):::terminator
+
+    %% Styling
+    classDef terminator fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#155724;
+    classDef process fill:#e8f4f8,stroke:#17a2b8,stroke-width:1.5px,color:#0c5460;
+    classDef subproc fill:#d1ecf1,stroke:#0c5460,stroke-width:2px,color:#0c5460;
+    classDef decision fill:#fff3cd,stroke:#ffc107,stroke-width:2px,color:#856404;

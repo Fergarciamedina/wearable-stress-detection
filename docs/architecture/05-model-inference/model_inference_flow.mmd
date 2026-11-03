@@ -1,0 +1,39 @@
+flowchart TD
+    %% Stage 5: Execution Flowchart
+    START(["Start Dashboard: streamlit run src/act/dashboard.py"]):::terminator --> LOAD_RESOURCES["Load Cached Resources via @st.cache_resource:<br/>- SignalLoader<br/>- FeatureExtractor<br/>- TensorBuilder"]:::process
+
+    LOAD_RESOURCES --> SIDEBAR["Sidebar User Configuration:<br/>1. Mode: PhysioNet (A) / Synthetic (B) / EmotiBit (C/D)<br/>2. Subject & Session Type<br/>3. Model: RandomForest / 1D-CNN / Majority<br/>4. Sensor Set: EDA+PPG / EDA / PPG<br/>5. Replay Stride (seconds)"]:::process
+
+    SIDEBAR --> INIT_ADAPTER{"Adapter in st.session_state?"}:::decision
+    INIT_ADAPTER -->|"No / Key Changed"| CREATE_ADAPTER["Instantiate ReplaySensorAdapter(window_len=30s, step=stride)"]:::process
+    INIT_ADAPTER -->|"Yes"| REUSE_ADAPTER["Retrieve active adapter instance"]:::process
+
+    CREATE_ADAPTER & REUSE_ADAPTER --> BTN_STEP{"User clicks 'Step Forward' or 'Auto Replay'?"}:::decision
+    BTN_STEP -->|"Step Forward"| ADVANCE_BUFFER["Advance time by stride seconds:<br/>adapter.advance_by_step()<br/>Push new biometric samples into buffer"]:::subproc
+
+    ADVANCE_BUFFER --> CHECK_BUF{"adapter.has_sufficient_data()?<br/>(Span >= 30 seconds)"}:::decision
+    CHECK_BUF -->|"No"| DISP_WAIT["Display: 'Awaiting sufficient sensor window buffer...'"]:::process
+    CHECK_BUF -->|"Yes"| GET_WIN["latest_win = adapter.get_latest_window()"]:::process
+
+    GET_WIN --> COL_SENSE["Render Column 1 (SENSE):<br/>Plot real-time EDA (4Hz) & BVP (64Hz) waveforms"]:::output
+
+    GET_WIN --> COL_THINK["Execute Column 2 (THINK):<br/>1. Extract 20D feature vector<br/>2. Load deploy_RF_EDA+PPG.pkl<br/>3. Run model.predict_proba(scaler.transform(X))<br/>4. Determine pred_label ('STRESS' vs 'REST')<br/>5. Render Probability Gauge"]:::subproc
+
+    COL_THINK --> BUILD_CTX["Construct Action Context:<br/>{prediction, confidence, eda_mean, pulse_bpm, motion_acc, quality}"]:::process
+
+    BUILD_CTX --> COL_ACT["Execute Column 3 (ACT):<br/>1. DeterministicRuleAct.generate_recommendation()<br/>   -> Outputs Action Code & Guidance (< 0.1ms)<br/>2. LLMActAdapter.generate_recommendation()<br/>   -> Outputs Natural Language Text"]:::subproc
+
+    COL_ACT --> LOG_BTN{"User clicks 'Save Anonymized Step Log'?"}:::decision
+    LOG_BTN -->|"Yes"| WRITE_LOG[("Append entry to:<br/>llm_logs/replay_session_log.json")]:::storage
+    LOG_BTN -->|"No"| RENDER_RESEARCH["Render Collapsible Research Expander:<br/>Display empirical metrics from research_comparison.csv"]:::output
+
+    WRITE_LOG --> RENDER_RESEARCH
+    RENDER_RESEARCH --> WAIT_NEXT(["Idle: Await next user interaction"]):::terminator
+
+    %% Styling
+    classDef terminator fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#155724;
+    classDef process fill:#e8f4f8,stroke:#17a2b8,stroke-width:1.5px,color:#0c5460;
+    classDef subproc fill:#d1ecf1,stroke:#0c5460,stroke-width:2px,color:#0c5460;
+    classDef decision fill:#fff3cd,stroke:#ffc107,stroke-width:2px,color:#856404;
+    classDef storage fill:#f8d7da,stroke:#dc3545,stroke-width:1.5px,color:#721c24;
+    classDef output fill:#e2e3e5,stroke:#383d41,stroke-width:1.5px,color:#383d41;

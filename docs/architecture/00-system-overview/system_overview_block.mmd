@@ -1,0 +1,42 @@
+graph TB
+    %% Level 0: Macro Block Diagram — Five Stages
+    subgraph S1["STAGE 1: DATA PREPARATION & PREPROCESSING"]
+        RAW["Raw Multimodal Data<br/>EDA (4Hz), BVP (64Hz), ACC (32Hz)<br/>PhysioNet DS1 (N=34 Cohort)"] --> LOAD["Signal Loading & Preprocessing<br/>signal_loader.py | filters.py"]
+        LOAD --> SEG["30-Second Sliding Windows<br/>stride=15s (Zero Cross-Subject Leakage)<br/>segmentation.py"]
+    end
+
+    subgraph S2["STAGE 2: FEATURE ENGINEERING & REPRESENTATION"]
+        SEG --> FEAT["Handcrafted Physiological Extraction<br/>10 EDA + 10 PPG = 20D Feature Vectors<br/>feature_extractor.py"]
+        SEG --> ACC_FEAT["Tri-Axial Motion Extraction<br/>7 Movement Features (SVM, Jerk, SMA)<br/>acc_features.py"]
+        SEG --> TENSOR["Temporal Tensor Resampling<br/>16Hz Common Grid (Channels × 480)<br/>tensor_builder.py"]
+    end
+
+    subgraph S3["STAGE 3: MODEL TRAINING & CONTEXTUALIZATION"]
+        FEAT --> RF_TRAIN["Random Forest Fitting<br/>StandardScaler + 100 Trees (depth=8)<br/>random_forest.py"]
+        TENSOR --> CNN_TRAIN["PyTorch 1D-CNN Fitting<br/>2 Conv Layers + GAP + Linear<br/>cnn1d.py"]
+        ACC_FEAT --> H1_CALIB["H1: Movement Gate Calibration<br/>25th Percentile Dynamic SVM<br/>movement_context.py"]
+        FEAT --> H2_INDEX["H2: Exact k-NN Exemplar Index<br/>k=7 (REST=0, STRESS=1, EXERCISE=2)<br/>knn_retrieval.py"]
+    end
+
+    subgraph S4["STAGE 4: MODEL EVALUATION & VALIDATION"]
+        RF_TRAIN & H1_CALIB & H2_INDEX --> LOSO["34-Fold Nested LOSO Engine<br/>Strict Outer Test Isolation<br/>run_research_experiments.py"]
+        LOSO --> EVAL["Evaluation Matrix E0–E3<br/>Macro-F1, Stress F1, Exercise FAR<br/>metrics.py"]
+        EVAL --> RES_STORE[("Persistence<br/>research_comparison.csv<br/>fold_predictions.csv")]
+    end
+
+    subgraph S5["STAGE 5: MODEL INFERENCE & APPLICATION"]
+        RES_STORE -.-> CKPT["Deployable Checkpoints<br/>deploy_RF_EDA+PPG.pkl"]
+        CKPT --> DASH["Streamlit Sense–Think–Act Replay<br/>Chronological Replay / Synthetic Demo<br/>dashboard.py"]
+        DASH --> SENSE["SENSE: Sliding Window Buffer<br/>sensor_adapter.py"]
+        SENSE --> THINK["THINK: Inference + Contextualization<br/>RF (20D) + H1 Motion Gate"]
+        THINK --> ACT["ACT: Adaptive Closed-Loop Guidance<br/>Rules Engine (0.01ms) vs LLM Adapter<br/>act_evaluator.py"]
+    end
+
+    style S1 fill:#f8f9fa,stroke:#495057,stroke-width:2px
+    style S2 fill:#e9ecef,stroke:#495057,stroke-width:2px
+    style S3 fill:#e8f4f8,stroke:#0c5460,stroke-width:2px
+    style S4 fill:#d1ecf1,stroke:#0c5460,stroke-width:2px
+    style S5 fill:#d4edda,stroke:#155724,stroke-width:2px
+    style RAW fill:#ffffff,stroke:#6c757d
+    style RES_STORE fill:#fff3cd,stroke:#856404
+    style CKPT fill:#fff3cd,stroke:#856404
