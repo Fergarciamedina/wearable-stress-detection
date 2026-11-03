@@ -24,6 +24,19 @@ Under strict subject-independent LOSO cross-validation across 34 participants (P
 | **1D-CNN** | PPG Only | 0.5056 [0.428, 0.578] | 60.05% | 71.73% |
 | **1D-CNN** | EDA + PPG (Fusion) | 0.4782 [0.428, 0.528] | 57.94% | 41.54% |
 
+### 🔬 Research Extension: Contextualization Benchmark (H1 & H2)
+
+Under strict 34-fold LOSO cross-validation, contextualizing RF (EDA+PPG) with accelerometer movement gating and physiological $k$-NN retrieval yields:
+
+| Exp | Configuration | Macro-F1 (Mean ± SD) | Balanced Acc | Rest F1 | Stress F1 | Exercise FAR |
+|:---:|:---|:---:|:---:|:---:|:---:|:---:|
+| **E0** | Baseline RF (no contextualization) | 0.6481 ± 0.1570 | 68.94% | 0.8303 | 0.4660 | 61.58% |
+| **E1** | **RF + H1 ACC-aware movement gate** | **0.6528 ± 0.1528** | **68.81%** | **0.8430** | **0.4627** | **15.58%** |
+| **E2** | RF + H2 KNN physiological similarity | 0.5226 ± 0.0849 | 54.18% | 0.8669 | 0.1784 | 2.79% |
+| **E3** | RF + H1 + H2 (Combined) | 0.5228 ± 0.0848 | 54.21% | 0.8671 | 0.1785 | 0.98% |
+
+**Key Research Takeaway:** H1 (ACC-aware dynamic movement gating) resolves the exercise confound by dropping Exercise FAR from **61.58% down to 15.58%** (a **74.7% relative reduction**) without sacrificing cognitive stress sensitivity (Macro-F1 0.6528 vs 0.6481).
+
 ### Key Scientific Takeaways:
 1. **The Representation Gap:** With small cohorts ($N=34$), domain-specific feature engineering (20 features: tonic/phasic EDA + cardiac variability) provides stronger inductive bias than end-to-end 1D convolutions on raw temporal tensors.
 2. **The Exercise Confound:** Across 7,048 exercise windows, models trigger false stress alarms in **41% to 72%** of cases, showing that sympathetic arousal from physical movement mimics cognitive stress.
@@ -41,6 +54,8 @@ code/
 ├── tests/                         # Automated unit & integration tests
 │   ├── __init__.py
 │   ├── test_pipeline.py           # 10 comprehensive pipeline tests
+│   ├── test_preprocessing.py      # Preprocessing & filter tests
+│   ├── test_research.py           # 10 H1/H2 contextualization research tests
 │   └── README.md
 ├── reference/                     # Reference notebooks & citations
 │   ├── Wearable_Dataset.ipynb
@@ -49,7 +64,7 @@ code/
     ├── __init__.py
     ├── config.py                  # Dynamic path resolution (ProjectConfig)
     ├── data_audit.py              # Cohort sanity & signal quality checks
-    ├── preprocessing/             # Signal loading, Butterworth filtering, 30s windowing
+    ├── preprocessing/             # Signal loading (EDA, PPG, ACC), filtering, 30s windowing
     │   ├── filters.py
     │   ├── segmentation.py
     │   └── signal_loader.py
@@ -63,10 +78,21 @@ code/
     ├── evaluation/                # Validation strategy & scoring
     │   ├── metrics.py             # Macro-F1, balanced acc, bootstrap CIs, exercise FAR
     │   └── splits.py              # LOSO partition manifest generation
+    ├── research/                  # Context-aware research extension (H1, H2, Fusion)
+    │   ├── README.md              # Research module synthesis
+    │   ├── run_research_experiments.py  # 34-fold LOSO research runner
+    │   ├── acc_aware/             # H1: ACC movement gating
+    │   │   ├── acc_features.py    # 7 3-axis ACC features
+    │   │   └── movement_context.py # MovementContextualizer gate
+    │   ├── similarity_aware/      # H2: Non-parametric k-NN retrieval
+    │   │   ├── knn_retrieval.py   # PhysiologicalKNN index (k=7)
+    │   │   └── similarity_context.py # SimilarityContextualizer
+    │   └── fusion/                # Fusion policies
+    │       └── fusion_policy.py   # E0, E1, E2, E3 evaluation matrix
     ├── act/                       # Closed-loop intervention
     │   ├── sensor_adapter.py      # Chronological streaming replay adapter
     │   ├── act_evaluator.py       # Deterministic rule engine & offline LLM adapter
-    │   ├── dashboard.py           # Streamlit real-time demonstrator UI
+    │   ├── dashboard.py           # Streamlit real-time demonstrator UI & research panel
     │   └── run_act_eval.py        # ACT rubric scoring runner
     ├── experiments/               # Factorial benchmark runner
     │   └── run_experiments.py     # 3 Models x 3 Sensors x 3 Seeds LOSO runner
@@ -99,13 +125,13 @@ Open `http://localhost:8501` to access the Streamlit dashboard in an isolated, C
 ```bash
 python3 -m unittest discover tests
 ```
-*Expected: 16 passing unit and regression tests in < 0.1s.*
+*Expected: 26 passing unit and regression tests in < 0.15s (16 pipeline tests + 10 research contextualization tests).*
 
 ### Launch the Sense-Think-Act Dashboard
 ```bash
 streamlit run src/act/dashboard.py
 ```
-*Note: If raw PhysioNet data is not downloaded, the dashboard automatically provides a zero-dependency **Synthetic Signal Demo** mode.*
+*Note: If raw PhysioNet data is not downloaded, the dashboard automatically provides a zero-dependency **Synthetic Signal Demo** mode as well as a collapsible **Research Extension** panel displaying empirical findings.*
 
 Or execute an offline CLI smoke test from the terminal:
 ```bash
@@ -118,13 +144,14 @@ python3 src/act/dashboard.py --mock --interval 0.5
 
 | Pipeline Stage | Native Command | Makefile Shortcut | Canonical Outputs Produced |
 |:---|:---|:---|:---|
-| **1. Unit Tests** | `python3 -m unittest discover tests` | `make test` | Console pass report (16 tests) |
+| **1. Unit Tests** | `python3 -m unittest discover tests` | `make test` | Console pass report (26 tests) |
 | **2. Data Audit** | `python3 src/data_audit.py` | `make audit` | `data/results/data_audit/` (`subjects.csv`, `exclusions.csv`, `signal_quality.csv`) |
 | **3. LOSO Splits** | `python3 src/evaluation/splits.py` | `make splits` | `data/public/splits/loso_splits.json` |
 | **4. Factorial Experiments** | `python3 src/experiments/run_experiments.py` | `make train` | `data/results/metrics/` (`factorial_metrics.csv`), `data/results/checkpoints/` |
-| **5. ACT Rubric Evaluation** | `python3 src/act/run_act_eval.py` | `make act-eval` | `data/results/metrics/act_rubric_summary.csv`, `data/llm_logs/act_evaluation_log.json` |
-| **6. Generate Figures** | `python3 src/visualization/generate_figures.py` | `make figures` | `data/results/figures/` (heatmaps, boxplots, interaction curves) |
-| **7. Streamlit Dashboard** | `streamlit run src/act/dashboard.py` | `make run-dashboard` | Browser UI at `http://localhost:8501` |
+| **5. Research Experiments (H1/H2)** | `python3 -m src.research.run_research_experiments` | — | `data/results/research/comparison/` (`research_comparison.csv`, `fold_predictions.csv`) |
+| **6. ACT Rubric Evaluation** | `python3 src/act/run_act_eval.py` | `make act-eval` | `data/results/metrics/act_rubric_summary.csv`, `data/llm_logs/act_evaluation_log.json` |
+| **7. Generate Figures** | `python3 src/visualization/generate_figures.py` | `make figures` | `data/results/figures/` (heatmaps, boxplots, interaction curves) |
+| **8. Streamlit Dashboard** | `streamlit run src/act/dashboard.py` | `make run-dashboard` | Browser UI at `http://localhost:8501` |
 
 ---
 
@@ -153,12 +180,13 @@ export WEARABLE_DATA_DIR="/path/to/my/data"
 ## 🔒 Scientific Scope, Validations & Disclosures
 
 ### 1. Implemented & Empirically Verified Functionality
-- **Signal Preprocessing:** Butterworth lowpass (EDA 1.0 Hz) and bandpass (PPG 0.5–8.0 Hz) filtering, cvxEDA tonic/phasic decomposition, and 30-second windowing.
-- **Statistical Feature Extraction:** 20 hand-crafted features (10 EDA: tonic mean/std/min/max/drift, phasic peak count/amp/sum; 10 PPG: mean/std, pulse rate, HRV SDNN/RMSSD/pNN50, spectral power).
+- **Signal Preprocessing:** Butterworth lowpass (EDA 1.0 Hz) and bandpass (PPG 0.5–8.0 Hz) filtering, cvxEDA tonic/phasic decomposition, and 30-second windowing across EDA, PPG, and tri-axial ACC.
+- **Statistical Feature Extraction:** 20 hand-crafted features (10 EDA, 10 PPG) plus 7 tri-axial ACC movement features (SVM, dynamic SVM, SMA, energy, jerk).
 - **Machine Learning Benchmark:** Majority Baseline, Random Forest, and PyTorch 1D-CNN across 3 sensor sets (EDA, PPG, Fusion) under nested Leave-One-Subject-Out (LOSO) cross-validation on PhysioNet DS1 ($N=34$ paired cohort).
 - **Exercise Confounding Analysis:** Quantitative false-stress alarm rate evaluation across 7,048 exercise windows.
+- **Context-Aware Research Extensions:** H1 ACC-aware movement gating (reducing exercise FAR by 74.7%) and H2 KNN physiological similarity retrieval.
 - **Sense–Think–Act Pipeline:** Deterministic sub-millisecond rule engine and offline LLM recommendation adapter (`offline-mock-v1`).
-- **Interactive UI:** Chronological replay demonstrator in Streamlit.
+- **Interactive UI:** Chronological replay demonstrator in Streamlit with integrated research metrics panel.
 
 ### 2. Synthetic Demonstrations
 - **Mode B (Synthetic Signal Demo):** Integrated into the Streamlit dashboard for zero-dependency evaluations. Demonstrates end-to-end signal buffering, feature scaling, model inference, and rule-based actuation without requiring the 2.5 GB PhysioNet raw dataset download.
@@ -167,8 +195,8 @@ export WEARABLE_DATA_DIR="/path/to/my/data"
 - **Hardware Integration:** The UDP broadcast receiver (port 31337) and local EmotiBit CSV ingestion classes are fully architected in code (`src/act/sensor_adapter.py`). Live on-body empirical recording and public-to-personal domain transfer evaluation remain scheduled for physical hardware commissioning.
 
 ### 4. Future Roadmap (Non-Implemented Extensions)
-- **ACC-Aware Motion Cancellation:** Active accelerometer gating (3-axis ACC thresholding) to suppress false stress alarms during vigorous physical movement.
-- **Vector-Similarity Cross-Subject Retrieval:** Embedding-based exemplar retrieval across participant baselines.
+- **Personalized Online Adaptation:** Continual subject-specific fine-tuning on consumer-grade hardware.
+- **WESAD Cross-Corpus Evaluation:** Benchmarking transfer learning across distinct wearable modalities.
 
 ---
 

@@ -41,6 +41,9 @@ class WindowSegmenter:
         bvp_sig = session_data["bvp_signal"]
         bvp_fs = session_data["bvp_fs"]
         bvp_valid = session_data["bvp_valid"]
+        acc_sig = session_data.get("acc_signal")
+        acc_fs = session_data.get("acc_fs", 32.0)
+        acc_valid = session_data.get("acc_valid", False)
 
         for interval in session_data["labeled_intervals"]:
             start_s = interval["start_s"]
@@ -73,6 +76,14 @@ class WindowSegmenter:
                     if bvp_idx_end <= len(bvp_sig):
                         bvp_win = bvp_sig[bvp_idx_start:bvp_idx_end]
 
+                # ACC slice if valid
+                acc_win = None
+                if acc_valid and acc_sig is not None and acc_fs > 0 and len(acc_sig) > 0:
+                    acc_idx_start = int(round(curr_start * acc_fs))
+                    acc_idx_end = int(round(curr_end * acc_fs))
+                    if acc_idx_end <= len(acc_sig):
+                        acc_win = acc_sig[acc_idx_start:acc_idx_end]
+
                 windows.append({
                     "subject_id": subject_id,
                     "session_type": "STRESS",
@@ -81,6 +92,8 @@ class WindowSegmenter:
                     "eda_window": eda_win,
                     "bvp_window": bvp_win,
                     "bvp_valid": bvp_win is not None,
+                    "acc_window": acc_win,
+                    "acc_valid": acc_win is not None,
                     "window_start_s": curr_start,
                     "window_end_s": curr_end
                 })
@@ -102,6 +115,9 @@ class WindowSegmenter:
         bvp_sig = session_data["bvp_signal"]
         bvp_fs = session_data["bvp_fs"]
         bvp_valid = session_data["bvp_valid"]
+        acc_sig = session_data.get("acc_signal")
+        acc_fs = session_data.get("acc_fs", 32.0)
+        acc_valid = session_data.get("acc_valid", False)
 
         total_duration_s = len(eda_sig) / eda_fs if eda_fs > 0 else 0.0
         curr_start = 0.0
@@ -122,6 +138,13 @@ class WindowSegmenter:
                 if bvp_idx_end <= len(bvp_sig):
                     bvp_win = bvp_sig[bvp_idx_start:bvp_idx_end]
 
+            acc_win = None
+            if acc_valid and acc_sig is not None and acc_fs > 0 and len(acc_sig) > 0:
+                acc_idx_start = int(round(curr_start * acc_fs))
+                acc_idx_end = int(round(curr_end * acc_fs))
+                if acc_idx_end <= len(acc_sig):
+                    acc_win = acc_sig[acc_idx_start:acc_idx_end]
+
             windows.append({
                 "subject_id": subject_id,
                 "session_type": session_type,
@@ -130,6 +153,8 @@ class WindowSegmenter:
                 "eda_window": eda_win,
                 "bvp_window": bvp_win,
                 "bvp_valid": bvp_win is not None,
+                "acc_window": acc_win,
+                "acc_valid": acc_win is not None,
                 "window_start_s": curr_start,
                 "window_end_s": curr_end
             })

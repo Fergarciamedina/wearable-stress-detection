@@ -38,7 +38,7 @@ class SignalLoader:
         if len(lines) < 2:
             return None, 0.0, np.array([], dtype=np.float32)
 
-        start_str = lines[0]
+        start_str = lines[0].split(",")[0].strip()
         try:
             if "-" in start_str:
                 start_dt = datetime.strptime(start_str, "%Y-%m-%d %H:%M:%S")
@@ -48,7 +48,7 @@ class SignalLoader:
             start_dt = None
 
         try:
-            fs = float(lines[1])
+            fs = float(lines[1].split(",")[0].strip())
         except Exception:
             fs = 0.0
 
@@ -110,6 +110,7 @@ class SignalLoader:
 
         eda_dt, eda_fs, eda_sig = self.parse_empatica_csv(os.path.join(folder_path, "EDA.csv"))
         bvp_dt, bvp_fs, bvp_sig = self.parse_empatica_csv(os.path.join(folder_path, "BVP.csv"))
+        acc_dt, acc_fs, acc_sig = self.parse_empatica_csv(os.path.join(folder_path, "ACC.csv"))
         tags = self.parse_tags_csv(os.path.join(folder_path, "tags.csv"))
 
         if eda_dt is None or eda_fs <= 0 or len(eda_sig) == 0:
@@ -119,6 +120,7 @@ class SignalLoader:
         labeled_intervals = self.reconstruct_stress_intervals(eda_dt, tags, is_v1)
 
         bvp_valid = (bvp_fs > 0 and len(bvp_sig) > 0 and subject_id != "f07")
+        acc_valid = (acc_fs > 0 and acc_sig.ndim == 2 and acc_sig.shape[1] == 3 and len(acc_sig) > 0)
 
         return {
             "subject_id": subject_id,
@@ -130,6 +132,9 @@ class SignalLoader:
             "bvp_fs": bvp_fs,
             "bvp_signal": bvp_sig if bvp_valid else np.array([], dtype=np.float32),
             "bvp_valid": bvp_valid,
+            "acc_fs": acc_fs if acc_valid else 32.0,
+            "acc_signal": acc_sig if acc_valid else np.empty((0, 3), dtype=np.float32),
+            "acc_valid": acc_valid,
             "tags": tags,
             "labeled_intervals": labeled_intervals  # List of dicts: {'start_s', 'end_s', 'label': 0 or 1, 'phase'}
         }
@@ -273,11 +278,13 @@ class SignalLoader:
 
         eda_dt, eda_fs, eda_sig = self.parse_empatica_csv(os.path.join(folder_path, "EDA.csv"))
         bvp_dt, bvp_fs, bvp_sig = self.parse_empatica_csv(os.path.join(folder_path, "BVP.csv"))
+        acc_dt, acc_fs, acc_sig = self.parse_empatica_csv(os.path.join(folder_path, "ACC.csv"))
 
         if eda_dt is None or eda_fs <= 0 or len(eda_sig) == 0:
             return None
 
         bvp_valid = (bvp_fs > 0 and len(bvp_sig) > 0)
+        acc_valid = (acc_fs > 0 and acc_sig.ndim == 2 and acc_sig.shape[1] == 3 and len(acc_sig) > 0)
 
         return {
             "subject_id": subject_id,
@@ -287,5 +294,8 @@ class SignalLoader:
             "eda_signal": eda_sig,
             "bvp_fs": bvp_fs,
             "bvp_signal": bvp_sig if bvp_valid else np.array([], dtype=np.float32),
-            "bvp_valid": bvp_valid
+            "bvp_valid": bvp_valid,
+            "acc_fs": acc_fs if acc_valid else 32.0,
+            "acc_signal": acc_sig if acc_valid else np.empty((0, 3), dtype=np.float32),
+            "acc_valid": acc_valid,
         }

@@ -63,11 +63,11 @@ pip install -e .
 ```
 
 ### Step 3: Run Automated Verification Tests
-Execute the unit and regression test suite (16 tests verifying signal filtering, window segmentation, feature extraction, tensor shaping, model inference, and metrics):
+Execute the unit and regression test suite (26 tests verifying signal filtering, window segmentation, feature extraction, tensor shaping, model inference, metrics, and H1/H2 research contextualization):
 ```bash
 python3 -m unittest discover tests
 ```
-*Expected output: `Ran 16 tests in ~0.08s` with `OK`.*
+*Expected output: `Ran 26 tests in ~0.15s` with `OK`.*
 
 ### Step 4: Launch the Sense–Think–Act Dashboard
 Launch the interactive Streamlit dashboard:
@@ -128,11 +128,12 @@ All key research pipeline tasks can be executed directly using Python or via the
 
 | Task | Native Command | Makefile Shortcut | Expected Output |
 |:---|:---|:---|:---|
-| **Automated Tests** | `python3 -m unittest discover tests` | `make test` | 16 tests passed |
+| **Automated Tests** | `python3 -m unittest discover tests` | `make test` | 26 tests passed |
 | **Data Audit** | `python3 src/data_audit.py` | `make audit` | Cohort summary & signal quality reports |
 | **Generate LOSO Splits** | `python3 src/evaluation/splits.py` | `make splits` | Generates `loso_splits.json` |
 | **Full LOSO Training** | `python3 src/experiments/run_experiments.py` | `make train` | Evaluates 3 models × 3 sensor sets across 34 subjects |
-| **Exercise FAR Analysis** | `python3 -m unittest tests.test_pipeline.TestPipeline.test_exercise_far_calculation` | `make eval` | Calculates exercise false alarm rate |
+| **Research Experiments (H1/H2)** | `python3 -m src.research.run_research_experiments` | — | Evaluates E0–E3 contextualization under 34-fold LOSO |
+| **Exercise FAR Analysis** | `python3 -m unittest tests.test_pipeline.TestWearablePipelineComprehensive.test_09_metrics_and_far_calculation` | `make eval` | Calculates exercise false alarm rate |
 | **ACT Rubric Evaluation** | `python3 src/act/run_act_eval.py` | `make act-eval` | Benchmark comparison between Rules and LLM |
 | **Figure Generation** | `python3 src/visualization/generate_figures.py` | `make figures` | Generates publication PNG figures |
 | **CLI Streamlit Smoke Test**| `python3 src/act/dashboard.py --mock --interval 0.5` | `make demo` | Non-GUI streaming simulation check |
@@ -149,17 +150,22 @@ Pre-computed checkpoints are included in `../data/results/checkpoints/` so you d
 - `deploy_CNN_PPG.pt` (PyTorch 1D-CNN, PPG tensor)
 - `deploy_CNN_EDA+PPG.pt` (PyTorch 1D-CNN, Multimodal tensor)
 
+Research comparison benchmarks are pre-computed in `../data/results/research/comparison/`:
+- `research_comparison.csv` (E0–E3 summary across 34 folds)
+- `fold_predictions.csv` (Subject-level predictions across E0–E3)
+
 ---
 
 ## ⚠️ Research Scope, Validations & Disclosures
 
 ### 1. Implemented & Verified Functionality
-- **Signal Preprocessing:** Butterworth lowpass/bandpass filtering and cvxEDA tonic/phasic decomposition.
-- **Statistical Features:** 20 statistical features extracted across EDA and PPG.
+- **Signal Preprocessing:** Butterworth lowpass/bandpass filtering, cvxEDA tonic/phasic decomposition, and 30-second windowing across EDA, PPG, and tri-axial ACC.
+- **Statistical Features:** 20 statistical features extracted across EDA and PPG, plus 7 tri-axial ACC movement features.
 - **LOSO Benchmark:** Evaluated on PhysioNet DS1 ($N=34$ participants) across Majority Baseline, Random Forest, and 1D-CNN.
 - **Exercise FAR Evaluation:** Quantitative false stress rate computed on 7,048 exercise windows.
+- **Context-Aware Research Extensions:** H1 ACC-aware movement gating and H2 physiological $k$-NN similarity retrieval evaluated under 34-fold LOSO.
 - **Sense–Think–Act:** Deterministic rule engine and offline LLM adapter (`offline-mock-v1`).
-- **Unit & Regression Tests:** 16 automated tests covering all components.
+- **Unit & Regression Tests:** 26 automated tests covering all components.
 
 ### 2. Synthetic Demonstrations
 - **Mode B (Synthetic Demo):** Streamlit dashboard provides built-in synthetic signal generation for instant evaluation without downloading the 2.5 GB PhysioNet dataset.
@@ -168,9 +174,8 @@ Pre-computed checkpoints are included in `../data/results/checkpoints/` so you d
 - **EmotiBit Integration:** UDP broadcast receiver (port 31337) and local CSV parsers are architected in code; on-body physical hardware validation and domain transfer remain scheduled for Phase 3.
 
 ### 4. Future Roadmap (Non-Implemented Extensions)
-- **ACC-Aware Motion Cancellation:** Accelerometer-gated artifact suppression to reduce exercise false alarms.
-- **Vector-Similarity Exemplar Retrieval:** Cross-subject baseline embedding retrieval.
-- **WESAD Benchmarking:** WESAD is archived in raw storage for reference but was not benchmarked in this study.
+- **Personalized Online Adaptation:** Continual subject-specific fine-tuning on consumer-grade hardware.
+- **WESAD Cross-Corpus Evaluation:** Benchmarking transfer learning across distinct wearable modalities.
 
 ---
 

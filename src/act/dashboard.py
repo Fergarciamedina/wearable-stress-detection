@@ -364,6 +364,46 @@ with col_act:
     else:
         st.write("Awaiting sensor input to trigger recommendations...")
 
+# ==================== RESEARCH SECTION ====================
+st.markdown("---")
+with st.expander("🔬 Research Extension: ACC-Aware & Similarity-Aware Contextualization (H1 & H2)", expanded=False):
+    st.markdown("### Contextualizing Wearable Stress: Suppressing Exercise False Alarms")
+    st.markdown(
+        "Wearable cognitive stress classifiers trained on autonomic arousal (EDA + PPG) suffer from severe false-alarm rates "
+        "(~61.6%) during physical exercise because sympathetic exertion mimics cognitive stress. "
+        "We evaluated two contextualization hypotheses under strict 34-fold Leave-One-Subject-Out (LOSO) cross-validation:"
+    )
+    st.markdown(
+        "- **H1 (ACC-Aware Movement Gate):** Dynamic acceleration gating from 3-axis accelerometer features suppresses alarms during vigorous movement.\n"
+        "- **H2 (Similarity-Aware Contextualization):** Exact $k$-NN ($k=7$) physiological exemplar retrieval detects exercise-cluster similarity in EDA+PPG space."
+    )
+
+    research_csv = os.path.join(PROJECT_ROOT, "data", "results", "research", "comparison", "research_comparison.csv")
+    if os.path.exists(research_csv):
+        res_df = pd.read_csv(research_csv)
+        st.dataframe(res_df, use_container_width=True)
+
+        m_col1, m_col2, m_col3, m_col4 = st.columns(4)
+        with m_col1:
+            st.metric("E0: Baseline RF FAR", "61.58%", "Uncontextualized")
+        with m_col2:
+            st.metric("E1: H1 (ACC-Aware) FAR", "15.58%", "-74.7% Relative", delta_color="inverse")
+        with m_col3:
+            st.metric("E1: H1 Macro-F1", "0.6528", "+0.0047 vs E0")
+        with m_col4:
+            st.metric("E3: Combined FAR", "0.98%", "-98.4% Relative", delta_color="inverse")
+
+        st.markdown("#### Scientific Takeaways:")
+        st.markdown(
+            "1. **H1 Confirmed (High Specificity):** The ACC movement gate reduces exercise false alarms from **61.58% down to 15.58%** "
+            "while *preserving* stress detection performance (Macro-F1 0.6528 vs 0.6481).\n"
+            "2. **H2 Trade-off (Over-Suppression):** Physiological similarity alone ($k$-NN) suppresses exercise FAR to **2.79%**, "
+            "but because exercise and severe cognitive stress share autonomic profiles, it reduces stress recall (Macro-F1 falls to 0.5226).\n"
+            "3. **Optimal Deployment:** H1 ACC-aware contextualization provides the optimal Pareto trade-off between sensitivity and specificity in daily living."
+        )
+    else:
+        st.info("Execute `python -m src.research.run_research_experiments` to generate empirical comparison metrics.")
+
 st.markdown("---")
 st.caption(
     "Verified Scientific Demonstration: Uses real PhysioNet benchmark recordings. "
